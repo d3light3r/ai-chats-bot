@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Chats - Хянах самбар</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans">
+  <div class="flex min-h-screen">
+    <!-- Зүүн талын цэс -->
+    <aside class="w-64 bg-white border-r border-gray-200 p-5 flex flex-col justify-between">
+      <div>
+        <div class="flex items-center gap-3 mb-8">
+          <div class="w-9 h-9 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold">AI</div>
+          <div>
+            <div class="font-bold text-sm">Чатбот</div>
+            <div class="text-xs text-gray-400">Таны ажлын талбар</div>
+          </div>
+        </div>
+        <div class="text-xs text-gray-400 font-semibold mb-3">Ажлын талбар</div>
+        <nav class="space-y-1 text-sm">
+          <button onclick="showTab('dashboard')" id="tab-dashboard" class="w-full text-left px-3 py-2.5 rounded-lg bg-emerald-50 text-emerald-700 font-medium">📊 Хянах самбар</button>
+          <button onclick="showTab('surveys')" id="tab-surveys" class="w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100">📋 Судалгаа</button>
+          <button onclick="showTab('automations')" id="tab-automations" class="w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100">⚡ Автоматжуулалт (AI)</button>
+          <button onclick="showTab('messages')" id="tab-messages" class="w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100">💬 Мессежүүд</button>
+          <button onclick="showTab('contacts')" id="tab-contacts" class="w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100">👥 Хэрэглэгчид</button>
+          <button onclick="showTab('broadcast')" id="tab-broadcast" class="w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100">📢 Нийтэд илгээх</button>
+          <button onclick="showTab('settings')" id="tab-settings" class="w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100">⚙️ Тохиргоо</button>
+        </nav>
+      </div>
+      <div class="text-xs text-gray-400 border-t pt-3">Self-Hosted AI Bot v1.0</div>
+    </aside>
+
+    <!-- Үндсэн агуулга -->
+    <main class="flex-1 p-8 overflow-y-auto">
+      
+      <!-- 1. ХЯНАХ САМБАР -->
+      <div id="view-dashboard" class="space-y-6">
+        <div class="flex justify-between items-center">
+          <h1 class="text-xl font-bold">Хянах самбар</h1>
+          <button onclick="loadAllData()" class="text-sm bg-white border px-3 py-1.5 rounded-lg hover:bg-gray-50">🔄 Шинэчлэх</button>
+        </div>
+
+        <!-- 5 Үзүүлэлт карт -->
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div class="bg-white p-4 rounded-xl border border-gray-200">
+            <div class="text-xs text-gray-500">Шинэ хэрэглэгч</div>
+            <div id="stat-users" class="text-2xl font-bold mt-2">0</div>
+            <div class="text-xs text-emerald-600 mt-2">Нийт бүртгэгдсэн</div>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-gray-200">
+            <div class="text-xs text-gray-500">Сэтгэгдэл</div>
+            <div id="stat-comments" class="text-2xl font-bold mt-2">0</div>
+            <div class="text-xs text-emerald-600 mt-2">Постын коммент</div>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-gray-200">
+            <div class="text-xs text-gray-500">Илгээсэн мессеж</div>
+            <div id="stat-messages" class="text-2xl font-bold mt-2">0</div>
