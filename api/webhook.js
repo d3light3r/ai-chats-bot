@@ -1,25 +1,47 @@
 module.exports = async (req, res) => {
-  const SUPABASE_URL = process.env.SUPABASE_URL;
-  const SUPABASE_KEY = process.env.SUPABASE_KEY;
+  // Supabase URL-ийн ард /rest/v1/ байвал автоматаар цэвэрлэнэ
+  let rawUrl = (process.env.SUPABASE_URL || 'https://kwytoixgrvhdxkzbnafv.supabase.co').trim();
+  const SUPABASE_URL = rawUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
+  const SUPABASE_KEY = (process.env.SUPABASE_KEY || '').trim();
 
-  // Туслах функц: Supabase REST API дуудах
+  // Туслах функц: Supabase REST API дуудах (Алдаа гаргахгүй хамгаалалттай)
   async function sbFetch(path, options = {}) {
     if (!SUPABASE_URL || !SUPABASE_KEY) return null;
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-      ...options,
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=representation',
-        ...(options.headers || {})
-      }
-    });
-    return response.json();
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+        ...options,
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation',
+          ...(options.headers || {})
+        }
+      });
+      const text = await response.text();
+      return text ? JSON.parse(text) : null;
+    } catch (e) {
+      return null;
+    }
   }
 
-  // 1. Facebook Webhook баталгаажуулалт (GET)
+  // 1. Шалгах горим болон Facebook Webhook баталгаажуулалт (GET)
   if (req.method === 'GET') {
+    // Хөтөч дээр ?test=1 гэж орвол холболтын статусыг харуулна
+    if (req.query.test) {
+      const settingsArr = await sbFetch('bot_settings?id=eq.1');
+      const settings = (settingsArr && settingsArr[0]) || {};
+      return res.status(200).json({
+        status: 'Сервер хэвийн ажиллаж байна',
+        supabase_url: SUPABASE_URL,
+        supabase_key_configured: Boolean(SUPABASE_KEY),
+        database_connected: Boolean(settingsArr && settingsArr.length > 0),
+        facebook_token_saved: Boolean(settings.page_access_token),
+        gemini_key_saved: Boolean(settings.gemini_api_key),
+        page_id_saved: settings.page_id || 'Хадгалагдаагүй'
+      });
+    }
+
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
@@ -35,8 +57,8 @@ module.exports = async (req, res) => {
     try {
       const settingsArr = await sbFetch('bot_settings?id=eq.1');
       const settings = (settingsArr && settingsArr[0]) || {};
-      const PAGE_TOKEN = settings.page_access_token;
-      const GEMINI_KEY = settings.gemini_api_key;
+      const PAGE_TOKEN = (settings.page_access_token || '').trim();
+      const GEMINI_KEY = (settings.gemini_api_key || '').trim();
       const SYSTEM_PROMPT = settings.ai_system_prompt || 'Та бол найрсаг туслах.';
 
       const body = req.body || {};
@@ -77,7 +99,7 @@ module.exports = async (req, res) => {
             }
             await sbFetch('contacts?on_conflict=psid', {
               method: 'POST',
-              headers: { 'Prefer': 'resolution=merge-duplicates' },
+              headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
               body: JSON.stringify(contactData)
             });
 
@@ -104,18 +126,27 @@ module.exports = async (req, res) => {
 
             // Хэрэв дүрэм таараагүй бол 24/7 Gemini AI хариулна
             if (!replyText && GEMINI_KEY) {
-              const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\nХэрэглэгчийн мессеж: ${userText}` }] }]
-                })
-              });
-              const aiData = await aiRes.json();
-              replyText = aiData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+              try {
+                const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\nХэрэглэгчийн мессеж: ${userText}` }] }]
+                  })
+                });
+                const aiData = await aiRes.json();
+                replyText = aiData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+              } catch (aiErr) {
+                replyText = '';
+              }
             }
 
-            if (replyText && PAGE_TOKEN) {
+            // Хэрэв AI түлхүүр ажиллаагүй бол стандарт хариу өгнө
+            if (!replyText) {
+              replyText = 'Сайн байна уу! Таны мессежийг хүлээн авлаа. Та утасны дугаараа үлдээнэ үү.';
+            }
+
+            if (PAGE_TOKEN) {
               await fetch(`https://graph.facebook.com/v21.0/me/messages?access_token=${PAGE_TOKEN}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
