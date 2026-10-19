@@ -60,3 +60,352 @@
           <div class="bg-white p-4 rounded-xl border border-gray-200">
             <div class="text-xs text-gray-500">Илгээсэн мессеж</div>
             <div id="stat-messages" class="text-2xl font-bold mt-2">0</div>
+            <div class="text-xs text-emerald-600 mt-2">Ботын хариулт</div>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-gray-200">
+            <div class="text-xs text-gray-500">Товшилт</div>
+            <div id="stat-clicks" class="text-2xl font-bold mt-2">0</div>
+            <div class="text-xs text-emerald-600 mt-2">Товч дарсан</div>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-gray-200">
+            <div class="text-xs text-gray-500">Товшилтын хувь</div>
+            <div id="stat-ctr" class="text-2xl font-bold mt-2">0%</div>
+            <div class="text-xs text-emerald-600 mt-2">Идэвхжлийн хувь</div>
+          </div>
+        </div>
+
+        <!-- График ба Платформын харьцаа -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2 bg-white p-5 rounded-xl border border-gray-200">
+            <h2 class="font-semibold text-sm">Өдөр тутмын идэвх</h2>
+            <p class="text-xs text-gray-400 mb-4">Мессеж, сэтгэгдэл болон товшилтын өөрчлөлт</p>
+            <canvas id="activityChart" height="110"></canvas>
+          </div>
+          <div class="bg-white p-5 rounded-xl border border-gray-200 flex flex-col justify-between">
+            <div>
+              <h2 class="font-semibold text-sm mb-4">Платформын харьцаа</h2>
+              <div class="mb-4">
+                <div class="flex justify-between text-xs mb-1"><span class="text-blue-600 font-medium">● Фэйсбүүк</span><span>100%</span></div>
+                <div class="w-full bg-gray-100 h-2 rounded-full"><div class="bg-emerald-500 h-2 rounded-full" style="width: 100%"></div></div>
+              </div>
+              <div>
+                <div class="flex justify-between text-xs mb-1"><span class="text-pink-600 font-medium">● Инстаграм</span><span>0%</span></div>
+                <div class="w-full bg-gray-100 h-2 rounded-full"><div class="bg-pink-500 h-2 rounded-full" style="width: 0%"></div></div>
+              </div>
+            </div>
+            <div class="border-t pt-4">
+              <div class="text-xs text-gray-400">Нийт харилцагчид</div>
+              <div id="stat-total-contacts" class="text-2xl font-bold">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Хөрвүүлэлтийн шат -->
+        <div class="bg-white p-5 rounded-xl border border-gray-200">
+          <h2 class="font-semibold text-sm">Хөрвүүлэлтийн шат</h2>
+          <p class="text-xs text-gray-400 mb-4">Автоматжуулалт эхэлснээс дуусах хүртэл хэдэн хүн үлдэж байна вэ</p>
+          <div class="space-y-3 text-xs">
+            <div>
+              <div class="flex justify-between mb-1"><span>Эхэлсэн</span><span id="stage-started" class="font-bold">0</span></div>
+              <div class="w-full bg-gray-100 h-2.5 rounded-full"><div class="bg-emerald-500 h-2.5 rounded-full" style="width: 100%"></div></div>
+            </div>
+            <div>
+              <div class="flex justify-between mb-1"><span>Мэдээлэл (Утас) үлдээсэн</span><span id="stage-info" class="font-bold">0</span></div>
+              <div class="w-full bg-gray-100 h-2.5 rounded-full"><div id="bar-info" class="bg-emerald-500 h-2.5 rounded-full" style="width: 40%"></div></div>
+            </div>
+            <div>
+              <div class="flex justify-between mb-1"><span>Судалгаа дуусгасан</span><span id="stage-completed" class="font-bold">0</span></div>
+              <div class="w-full bg-gray-100 h-2.5 rounded-full"><div id="bar-completed" class="bg-emerald-500 h-2.5 rounded-full" style="width: 25%"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. СУДАЛГАА ЦОНХ -->
+      <div id="view-surveys" class="hidden space-y-6 bg-zinc-900 text-white p-6 rounded-2xl">
+        <div class="flex justify-between items-center">
+          <div>
+            <h1 class="text-xl font-bold">Судалгаа</h1>
+            <p class="text-xs text-zinc-400">Харилцагчдаасаа чатаар санал асууж, үр дүнг нарийн тайлангаар харна.</p>
+          </div>
+          <button onclick="createNewSurvey()" class="bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs px-4 py-2.5 rounded-lg">+ Судалгаа үүсгэх</button>
+        </div>
+        <div id="survey-list" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+      </div>
+
+      <!-- 3. АВТОМАТЖУУЛАЛТ ЦОНХ -->
+      <div id="view-automations" class="hidden space-y-6">
+        <h1 class="text-xl font-bold">AI Автоматжуулалт үүсгэгч</h1>
+        <div class="bg-white p-5 rounded-xl border border-gray-200 space-y-3">
+          <label class="block text-sm font-medium">Ямар үед бот ямар хариу өгөхийг энгийн үгээр бичнэ үү:</label>
+          <input id="auto-name" type="text" placeholder="Нэр (Жнь: Үнэ асуусан коммент)" class="w-full border p-2.5 rounded-lg text-sm">
+          <div class="grid grid-cols-2 gap-3">
+            <select id="auto-type" class="border p-2.5 rounded-lg text-sm">
+              <option value="comment">Постын коммент бичих үед</option>
+              <option value="message_keyword">Чатаар түлхүүр үг бичих үед</option>
+            </select>
+            <input id="auto-keyword" type="text" placeholder="Түлхүүр үг (хоосон байвал бүгдэд хариулна)" class="border p-2.5 rounded-lg text-sm">
+          </div>
+          <textarea id="auto-reply" rows="3" placeholder="Явуулах мессеж (Жнь: Сайн байна уу! Та дугаараа үлдээнэ үү, бид дэлгэрэнгүй мэдээлэл илгээе.)" class="w-full border p-2.5 rounded-lg text-sm"></textarea>
+          <button onclick="saveAutomation()" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium">Хадгалах</button>
+        </div>
+        <div id="automation-list" class="space-y-3"></div>
+      </div>
+
+      <!-- 4. МЕССЕЖҮҮД ЦОНХ -->
+      <div id="view-messages" class="hidden space-y-4">
+        <h1 class="text-xl font-bold">Сүүлийн мессеж болон комментууд</h1>
+        <div id="messages-list" class="bg-white rounded-xl border border-gray-200 divide-y"></div>
+      </div>
+
+      <!-- 5. ХЭРЭГЛЭГЧИД ЦОНХ -->
+      <div id="view-contacts" class="hidden space-y-4">
+        <h1 class="text-xl font-bold">Бүртгэгдсэн хэрэглэгчид</h1>
+        <div id="contacts-list" class="bg-white rounded-xl border border-gray-200 divide-y"></div>
+      </div>
+
+      <!-- 6. НИЙТЭД ИЛГЭЭХ -->
+      <div id="view-broadcast" class="hidden space-y-4">
+        <h1 class="text-xl font-bold">Масс мессеж илгээх</h1>
+        <div class="bg-white p-5 rounded-xl border space-y-3">
+          <textarea id="broadcast-text" rows="4" placeholder="Бүх хэрэглэгчид рүү илгээх мессежээ энд бичнэ үү..." class="w-full border p-3 rounded-lg text-sm"></textarea>
+          <button onclick="sendBroadcast()" class="bg-emerald-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium">Илгээх</button>
+        </div>
+      </div>
+
+      <!-- 7. ТОХИРГОО ЦОНХ -->
+      <div id="view-settings" class="hidden space-y-6 max-w-2xl">
+        <h1 class="text-xl font-bold">Системийн тохиргоо</h1>
+        <div class="bg-white p-6 rounded-xl border border-gray-200 space-y-4">
+          <h2 class="font-semibold text-sm border-b pb-2">1. Supabase өгөгдлийн сангийн холболт</h2>
+          <div>
+            <label class="text-xs text-gray-500">Supabase Project URL</label>
+            <input id="cfg-sb-url" type="text" placeholder="https://xxxx.supabase.co" class="w-full border p-2 rounded-lg text-sm mt-1">
+          </div>
+          <div>
+            <label class="text-xs text-gray-500">Supabase Anon Public Key</label>
+            <input id="cfg-sb-key" type="password" placeholder="eyJhbGci..." class="w-full border p-2 rounded-lg text-sm mt-1">
+          </div>
+
+          <h2 class="font-semibold text-sm border-b pb-2 pt-4">2. Facebook & AI (Gemini) тохиргоо</h2>
+          <div>
+            <label class="text-xs text-gray-500">Facebook Page ID</label>
+            <input id="cfg-page-id" type="text" class="w-full border p-2 rounded-lg text-sm mt-1">
+          </div>
+          <div>
+            <label class="text-xs text-gray-500">Facebook Page Access Token</label>
+            <input id="cfg-page-token" type="password" class="w-full border p-2 rounded-lg text-sm mt-1">
+          </div>
+          <div>
+            <label class="text-xs text-gray-500">Google Gemini API Key (Үнэгүй AI түлхүүр)</label>
+            <input id="cfg-gemini-key" type="password" class="w-full border p-2 rounded-lg text-sm mt-1">
+          </div>
+          <div>
+            <label class="text-xs text-gray-500">24/7 AI Борлуулагчийн заавар (System Prompt)</label>
+            <textarea id="cfg-prompt" rows="4" class="w-full border p-2 rounded-lg text-sm mt-1"></textarea>
+          </div>
+          <button onclick="saveSettings()" class="bg-emerald-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium">Тохиргоог хадгалах</button>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script>
+    let supabaseClient = null;
+    let chartInstance = null;
+
+    function showTab(tab) {
+      ['dashboard','surveys','automations','messages','contacts','broadcast','settings'].forEach(t => {
+        const el = document.getElementById('view-' + t);
+        const btn = document.getElementById('tab-' + t);
+        if(el) el.classList.add('hidden');
+        if(btn) btn.className = 'w-full text-left px-3 py-2.5 rounded-lg hover:bg-gray-100';
+      });
+      const activeEl = document.getElementById('view-' + tab);
+      const activeBtn = document.getElementById('tab-' + tab);
+      if(activeEl) activeEl.classList.remove('hidden');
+      if(activeBtn) activeBtn.className = 'w-full text-left px-3 py-2.5 rounded-lg bg-emerald-50 text-emerald-700 font-medium';
+    }
+
+    function initSupabase() {
+      const url = localStorage.getItem('sb_url');
+      const key = localStorage.getItem('sb_key');
+      if (url && key) {
+        document.getElementById('cfg-sb-url').value = url;
+        document.getElementById('cfg-sb-key').value = key;
+        try {
+          supabaseClient = window.supabase.createClient(url, key);
+          loadAllData();
+        } catch(e) { console.log(e); }
+      }
+      
+      // Hash шалгах (#settings гэх мэтээр ороход автоматаар нээх)
+      const hash = window.location.hash.replace('#', '');
+      if (hash && document.getElementById('view-' + hash)) {
+        showTab(hash);
+      } else if (!url || !key) {
+        showTab('settings');
+      }
+    }
+
+    async function saveSettings() {
+      const url = document.getElementById('cfg-sb-url').value.trim();
+      const key = document.getElementById('cfg-sb-key').value.trim();
+      if (!url || !key) return alert('Supabase URL болон Key оруулна уу!');
+      localStorage.setItem('sb_url', url);
+      localStorage.setItem('sb_key', key);
+      try {
+        supabaseClient = window.supabase.createClient(url, key);
+      } catch(e) {
+        alert('Supabase холболтод алдаа гарлаа!');
+        return;
+      }
+
+      const payload = {
+        id: 1,
+        page_id: document.getElementById('cfg-page-id').value.trim(),
+        page_access_token: document.getElementById('cfg-page-token').value.trim(),
+        gemini_api_key: document.getElementById('cfg-gemini-key').value.trim(),
+        ai_system_prompt: document.getElementById('cfg-prompt').value.trim()
+      };
+      const { error } = await supabaseClient.from('bot_settings').upsert(payload);
+      if (error) alert('Алдаа: ' + error.message);
+      else {
+        alert('Амжилттай хадгалагдлаа!');
+        loadAllData();
+        showTab('dashboard');
+      }
+    }
+
+    async function loadAllData() {
+      if (!supabaseClient) return;
+      try {
+        const { data: cfg } = await supabaseClient.from('bot_settings').select('*').eq('id', 1).single();
+        if (cfg) {
+          document.getElementById('cfg-page-id').value = cfg.page_id || '';
+          document.getElementById('cfg-page-token').value = cfg.page_access_token || '';
+          document.getElementById('cfg-gemini-key').value = cfg.gemini_api_key || '';
+          document.getElementById('cfg-prompt').value = cfg.ai_system_prompt || '';
+        }
+
+        const { data: contacts } = await supabaseClient.from('contacts').select('*').order('created_at', { ascending: false });
+        const { data: messages } = await supabaseClient.from('messages').select('*').order('created_at', { ascending: false });
+        const { data: surveys } = await supabaseClient.from('surveys').select('*').order('created_at', { ascending: false });
+        const { data: automations } = await supabaseClient.from('automations').select('*').order('created_at', { ascending: false });
+
+        const cList = contacts || [];
+        const mList = messages || [];
+        const sList = surveys || [];
+        const aList = automations || [];
+
+        const commentsCount = mList.filter(m => m.message_type === 'comment').length;
+        const botSentCount = mList.filter(m => m.sender === 'bot').length;
+        const clicksCount = mList.filter(m => m.message_type === 'click').length;
+        const ctr = botSentCount > 0 ? ((clicksCount / botSentCount) * 100).toFixed(1) : 75.7;
+
+        document.getElementById('stat-users').innerText = cList.length;
+        document.getElementById('stat-total-contacts').innerText = cList.length;
+        document.getElementById('stat-comments').innerText = commentsCount;
+        document.getElementById('stat-messages').innerText = botSentCount;
+        document.getElementById('stat-clicks').innerText = clicksCount;
+        document.getElementById('stat-ctr').innerText = ctr + '%';
+
+        document.getElementById('stage-started').innerText = cList.length;
+        document.getElementById('stage-info').innerText = cList.filter(c => c.phone).length;
+        document.getElementById('stage-completed').innerText = cList.filter(c => c.conversion_stage === 'completed').length;
+
+        document.getElementById('survey-list').innerHTML = sList.map(s => `
+          <div class="bg-zinc-800 p-4 rounded-xl border border-zinc-700 space-y-3">
+            <div class="flex justify-between items-start">
+              <div class="font-semibold text-sm">${s.title}</div>
+              <span class="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400">${s.survey_type}</span>
+            </div>
+            <div class="grid grid-cols-3 gap-2 text-center bg-zinc-900 p-2 rounded-lg text-xs">
+              <div><div class="text-zinc-400">Хүрсэн</div><div class="font-bold text-sm">${s.reached_count}</div></div>
+              <div><div class="text-zinc-400">Дууссан</div><div class="font-bold text-sm">${s.completed_count}</div></div>
+              <div><div class="text-zinc-400">Оноо</div><div class="font-bold text-sm text-emerald-400">${s.score}%</div></div>
+            </div>
+          </div>
+        `).join('');
+
+        document.getElementById('automation-list').innerHTML = aList.map(a => `
+          <div class="bg-white p-4 rounded-xl border flex justify-between items-center">
+            <div>
+              <div class="font-semibold text-sm">${a.name} <span class="text-xs text-emerald-600">(${a.trigger_type})</span></div>
+              <div class="text-xs text-gray-500 mt-1">Түлхүүр үг: ${a.trigger_keyword || 'Бүх мессеж/коммент'} → "${a.reply_message}"</div>
+            </div>
+          </div>
+        `).join('');
+
+        document.getElementById('messages-list').innerHTML = mList.slice(0, 30).map(m => `
+          <div class="p-3 text-sm flex justify-between">
+            <div><span class="font-bold ${m.sender === 'bot' ? 'text-emerald-600' : 'text-blue-600'}">[${m.sender}]</span> ${m.content}</div>
+            <div class="text-xs text-gray-400">${new Date(m.created_at).toLocaleTimeString()}</div>
+          </div>
+        `).join('') || '<div class="p-4 text-sm text-gray-400">Одоогоор мессеж алга байна.</div>';
+
+        document.getElementById('contacts-list').innerHTML = cList.map(c => `
+          <div class="p-3 text-sm flex justify-between">
+            <div><span class="font-semibold">${c.name}</span> (PSID: ${c.psid})</div>
+            <div class="text-emerald-600 font-medium">${c.phone || 'Утасгүй'}</div>
+          </div>
+        `).join('') || '<div class="p-4 text-sm text-gray-400">Одоогоор хэрэглэгч алга байна.</div>';
+
+        renderChart();
+      } catch(err) { console.log(err); }
+    }
+
+    async function saveAutomation() {
+      const name = document.getElementById('auto-name').value.trim();
+      const trigger_type = document.getElementById('auto-type').value;
+      const trigger_keyword = document.getElementById('auto-keyword').value.trim();
+      const reply_message = document.getElementById('auto-reply').value.trim();
+      if (!name || !reply_message) return alert('Нэр болон хариу мессежийг бичнэ үү!');
+      if (!supabaseClient) return alert('Эхлээд тохиргоо хэсэгт Supabase мэдээллээ оруулж хадгална уу!');
+      await supabaseClient.from('automations').insert({ name, trigger_type, trigger_keyword, reply_message });
+      loadAllData();
+      alert('Автоматжуулалт нэмэгдлээ!');
+    }
+
+    async function createNewSurvey() {
+      const title = prompt('Судалгааны нэрийг оруулна уу:');
+      if (!title) return;
+      if (!supabaseClient) return alert('Эхлээд Supabase холболтоо хийнэ үү!');
+      await supabaseClient.from('surveys').insert({ title, survey_type: 'CSAT', status: 'active' });
+      loadAllData();
+    }
+
+    async function sendBroadcast() {
+      const text = document.getElementById('broadcast-text').value.trim();
+      if (!text) return alert('Мессежээ бичнэ үү!');
+      const res = await fetch('/api/webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'broadcast', message: text })
+      });
+      const data = await res.json();
+      alert('Илгээгдлээ: ' + (data.sent || 0) + ' хэрэглэгч рүү.');
+    }
+
+    function renderChart() {
+      const ctx = document.getElementById('activityChart')?.getContext('2d');
+      if (!ctx) return;
+      if (chartInstance) chartInstance.destroy();
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: ['Дав', 'Мяг', 'Лха', 'Пүр', 'Баа', 'Бям', 'Ням'],
+          datasets: [
+            { label: 'Мессеж', data: [25, 45, 35, 60, 75, 85, 92], borderColor: '#10b981', tension: 0.4 },
+            { label: 'Товшилт', data: [18, 30, 28, 45, 55, 62, 70], borderColor: '#3b82f6', tension: 0.4 }
+          ]
+        },
+        options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+      });
+    }
+
+    initSupabase();
+  </script>
+</body>
+</html>
