@@ -1,5 +1,6 @@
 module.exports = async (req, res) => {
-  let rawUrl = (process.env.SUPABASE_URL || '').trim();
+  // Таны Supabase URL-ийг шууд анхдагч утгаар хадгаллаа (Дахиж салахгүй)
+  let rawUrl = (process.env.SUPABASE_URL || 'https://kwytoixgrvhdxkzbnafv.supabase.co').trim();
   const SUPABASE_URL = rawUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
   const SUPABASE_KEY = (process.env.SUPABASE_KEY || '').trim();
 
@@ -24,12 +25,12 @@ module.exports = async (req, res) => {
   }
 
   async function askGemini(apiKey, systemPrompt, userText) {
+    // Google Gemini API-ийн албан ёсны загварууд
     const models = [
-      'gemini-3.8-flash',
-      'gemini-3.5-flash-lite',
-      'gemini-flash-latest',
-      'gemini-3.6-flash',
-      'gemini-2.5-flash'
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
+      'gemini-2.5-pro'
     ];
     let lastError = null;
 
@@ -47,7 +48,7 @@ module.exports = async (req, res) => {
         );
         const aiData = await aiRes.json();
         if (aiData?.error) {
-          lastError = aiData.error.message || JSON.stringify(aiData.error);
+          lastError = `${model}: ${aiData.error.message || JSON.stringify(aiData.error)}`;
           continue;
         }
         const parts = aiData?.candidates?.[0]?.content?.parts || [];
@@ -65,23 +66,23 @@ module.exports = async (req, res) => {
     return { reply: '', model: null, error: lastError };
   }
 
-  // 1. GET хүсэлт (Test горим)
+  // 1. GET хүсэлт (Test горим ба Facebook Webhook баталгаажуулалт)
   if (req.method === 'GET') {
-    const settingsArr = await sbFetch('bot_settings?id=eq.1');
-    const settings = (settingsArr && settingsArr[0]) || {};
-    
-    const geminiKey = (settings.gemini_api_key || process.env.GEMINI_API_KEY || '').trim();
-    const prompt = settings.ai_system_prompt || 'Та бол найрсаг туслах.';
-
-    let aiTest = { reply: '', model: null, error: 'Gemini key олдсонгүй' };
-    if (geminiKey) {
-      aiTest = await askGemini(geminiKey, prompt, 'Сайн байна уу');
-    }
-
     if (req.query.test) {
+      const settingsArr = await sbFetch('bot_settings?id=eq.1');
+      const settings = (settingsArr && settingsArr[0]) || {};
+
+      const geminiKey = (settings.gemini_api_key || process.env.GEMINI_API_KEY || '').trim();
+      const prompt = settings.ai_system_prompt || 'Та бол найрсаг туслах.';
+
+      let aiTest = { reply: '', model: null, error: 'Gemini key олдсонгүй' };
+      if (geminiKey) {
+        aiTest = await askGemini(geminiKey, prompt, 'Сайн байна уу');
+      }
+
       return res.status(200).json({
         status: 'Сервер хэвийн ажиллаж байна',
-        supabase_url: SUPABASE_URL || 'Тохируулаагүй',
+        supabase_url: SUPABASE_URL,
         supabase_key_configured: Boolean(SUPABASE_KEY),
         database_connected: Boolean(settingsArr && settingsArr.length > 0),
         facebook_token_saved: Boolean(settings.page_access_token || process.env.PAGE_ACCESS_TOKEN),
@@ -107,7 +108,7 @@ module.exports = async (req, res) => {
     try {
       const settingsArr = await sbFetch('bot_settings?id=eq.1');
       const settings = (settingsArr && settingsArr[0]) || {};
-      
+
       const PAGE_TOKEN = (settings.page_access_token || process.env.PAGE_ACCESS_TOKEN || '').trim();
       const GEMINI_KEY = (settings.gemini_api_key || process.env.GEMINI_API_KEY || '').trim();
       const SYSTEM_PROMPT = settings.ai_system_prompt || 'Та бол найрсаг туслах.';
@@ -134,12 +135,13 @@ module.exports = async (req, res) => {
             const senderPsid = event.sender?.id;
             if (!senderPsid || event.message?.is_echo) continue;
 
-            // Хэрэглэгч Get Started дарс эсвэл текст/postback явуулсныг ялгах
+            // Хэрэглэгч Get Started дарсан эсвэл текст бичсэнийг ялгах
             let userText = event.message?.text || '';
             if (event.postback) {
               const payload = event.postback.payload || '';
-              if (payload === 'GET_STARTED' || !payload) {
-                userText = 'Сайн байна уу? Танд ямар мэдээлэл хэрэгтэй вэ?';
+              const title = event.postback.title || '';
+              if (payload === 'GET_STARTED' || title.toLowerCase().includes('get started') || !payload) {
+                userText = 'Сайн байна уу? Танай байгууллагын талаар мэдээлэл авъя.';
               } else {
                 userText = payload;
               }
