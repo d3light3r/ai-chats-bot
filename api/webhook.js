@@ -1,10 +1,10 @@
 module.exports = async (req, res) => {
   // Supabase URL-ийн ард /rest/v1/ байвал автоматаар цэвэрлэнэ
-  let rawUrl = (process.env.SUPABASE_URL || 'https://kwytoixgrvhdxkzbnafv.supabase.co').trim();
+  let rawUrl = (process.env.SUPABASE_URL || '').trim();
   const SUPABASE_URL = rawUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
   const SUPABASE_KEY = (process.env.SUPABASE_KEY || '').trim();
 
-  // Туслах функц: Supabase REST API дуудах (Алдаа гаргахгүй хамгаалалттай)
+  // Туслах функц: Supabase REST API дуудах
   async function sbFetch(path, options = {}) {
     if (!SUPABASE_URL || !SUPABASE_KEY) return null;
     try {
@@ -25,27 +25,85 @@ module.exports = async (req, res) => {
     }
   }
 
+  // Туслах функц: Gemini AI-г хамгийн сүүлийн үеийн загваруудаар дараалж дуудах
+  async function askGemini(apiKey, systemPrompt, userText) {
+    const models = [
+      'gemini-3.8-flash',
+      'gemini-3.5-flash-lite',
+      'gemini-flash-latest',
+      'gemini-3.6-flash',
+      'gemini-2.5-flash'
+    ];
+    let lastError = null;
+
+    for (const model of models) {
+      try {
+        const aiRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    { text: `${systemPrompt}\n\nХэрэглэгчийн мессеж: ${userText}` }
+                  ]
+                }
+              ]
+            })
+          }
+        );
+        const aiData = await aiRes.json();
+        if (aiData?.error) {
+          lastError = aiData.error.message || JSON.stringify(aiData.error);
+          continue;
+        }
+        const parts = aiData?.candidates?.[0]?.content?.parts || [];
+        const reply =
+          parts.filter(p => !p.thought && p.text).map(p => p.text).join('\n').trim() ||
+          parts[0]?.text?.trim() ||
+          '';
+        if (reply) {
+          return { reply, model, error: null };
+        }
+      } catch (err) {
+        lastError = err.message;
+      }
+    }
+    return { reply: '', model: null, error: lastError };
+  }
+
   // 1. Шалгах горим болон Facebook Webhook баталгаажуулалт (GET)
   if (req.method === 'GET') {
-    // Хөтөч дээр ?test=1 гэж орвол холболтын статусыг харуулна
     if (req.query.test) {
       const settingsArr = await sbFetch('bot_settings?id=eq.1');
       const settings = (settingsArr && settingsArr[0]) || {};
+      const geminiKey = (settings.gemini_api_key || '').trim();
+      const prompt = settings.ai_system_prompt || 'Та бол найрсаг туслах.';
+
+      let aiTest = { reply: '', model: null, error: 'Gemini key хадгалагдаагүй' };
+      if (geminiKey) {
+        aiTest = await askGemini(geminiKey, prompt, 'Сайн байна уу');
+      }
+
       return res.status(200).json({
         status: 'Сервер хэвийн ажиллаж байна',
         supabase_url: SUPABASE_URL,
         supabase_key_configured: Boolean(SUPABASE_KEY),
         database_connected: Boolean(settingsArr && settingsArr.length > 0),
         facebook_token_saved: Boolean(settings.page_access_token),
-        gemini_key_saved: Boolean(settings.gemini_api_key),
-        page_id_saved: settings.page_id || 'Хадгалагдаагүй'
+        gemini_key_saved: Boolean(geminiKey),
+        page_id_saved: settings.page_id || 'Хадгалагдаагүй',
+        ai_working_model: aiTest.model || 'Ажилласангүй',
+        ai_sample_reply: aiTest.reply || null,
+        ai_error: aiTest.error || null
       });
     }
 
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
-
     if (mode === 'subscribe' && token === 'noflow_secret_123') {
       return res.status(200).send(challenge);
     }
@@ -81,7 +139,6 @@ module.exports = async (req, res) => {
       // B. Facebook-ээс ирсэн дохио
       if (body.object === 'page') {
         for (const entry of (body.entry || [])) {
-          
           // 1) Messenger-ээр ирсэн чат
           for (const event of (entry.messaging || [])) {
             const senderPsid = event.sender?.id;
@@ -114,11 +171,12 @@ module.exports = async (req, res) => {
               })
             });
 
-            // Түлхүүр үгийн автоматжуулалт шалгах
+            // Түлхүүр үгийн автоматжуулалт шалгах (Зөвхөн түлхүүр үг бичигдсэн дүрмийг шалгана)
             const automations = await sbFetch('automations?is_active=eq.true&trigger_type=eq.message_keyword');
             let replyText = '';
             for (const auto of (automations || [])) {
-              if (!auto.trigger_keyword || userText.toLowerCase().includes(auto.trigger_keyword.toLowerCase())) {
+              const kw = (auto.trigger_keyword || '').trim().toLowerCase();
+              if (kw && userText.toLowerCase().includes(kw)) {
                 replyText = auto.reply_message;
                 break;
               }
@@ -126,22 +184,10 @@ module.exports = async (req, res) => {
 
             // Хэрэв дүрэм таараагүй бол 24/7 Gemini AI хариулна
             if (!replyText && GEMINI_KEY) {
-              try {
-                const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_KEY}`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    contents: [{ parts: [{ text: `${SYSTEM_PROMPT}\n\nХэрэглэгчийн мессеж: ${userText}` }] }]
-                  })
-                });
-                const aiData = await aiRes.json();
-                replyText = aiData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-              } catch (aiErr) {
-                replyText = '';
-              }
+              const aiResult = await askGemini(GEMINI_KEY, SYSTEM_PROMPT, userText);
+              replyText = aiResult.reply;
             }
 
-            // Хэрэв AI түлхүүр ажиллаагүй бол стандарт хариу өгнө
             if (!replyText) {
               replyText = 'Сайн байна уу! Таны мессежийг хүлээн авлаа. Та утасны дугаараа үлдээнэ үү.';
             }
@@ -152,6 +198,7 @@ module.exports = async (req, res) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ recipient: { id: senderPsid }, message: { text: replyText } })
               });
+
               await sbFetch('messages', {
                 method: 'POST',
                 body: JSON.stringify({ psid: senderPsid, sender: 'bot', message_type: 'text', content: replyText })
@@ -188,6 +235,7 @@ module.exports = async (req, res) => {
         }
         return res.status(200).send('EVENT_RECEIVED');
       }
+
       return res.status(200).json({ ok: true });
     } catch (err) {
       return res.status(200).send('EVENT_RECEIVED');
