@@ -1,7 +1,8 @@
 module.exports = async (req, res) => {
-  // Таны Supabase URL анхдагч утгаар хадгалагдсан
-  let rawUrl = (process.env.SUPABASE_URL || 'https://kwytoixgrvhdxkzbnafv.supabase.co').trim();
-  const SUPABASE_URL = rawUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
+  // Supabase URL болон Key-г кодон дотор шууд мөнхөллөө (Дахиж устахгүй, хоосон хоцрохгүй)
+  const SUPABASE_URL = 'https://kwytoixgrvhdxkzbnafv.supabase.co';
+  
+  // Та Supabase Settings -> API хэсгээс авсан 'anon' (publishable) түлхүүрээ доорх хашилт дотор хуулж тавьж болно:
   const SUPABASE_KEY = (process.env.SUPABASE_KEY || '').trim();
 
   async function sbFetch(path, options = {}) {
@@ -24,7 +25,6 @@ module.exports = async (req, res) => {
     }
   }
 
-  // Gemini AI дуудах функц (Gemini 3.1 загварууд + Автоматаар боломжит загвар илрүүлэгчтэй)
   async function askGemini(apiKey, systemPrompt, userText) {
     let models = [
       'gemini-3.1-flash-preview',
@@ -34,7 +34,6 @@ module.exports = async (req, res) => {
       'gemini-flash-latest'
     ];
 
-    // Түлхүүрт зөвшөөрөгдсөн загваруудыг Google-ээс шууд асууж жагсаалтыг баяжуулах
     try {
       const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
       const listData = await listRes.json();
@@ -44,7 +43,6 @@ module.exports = async (req, res) => {
           .map(m => m.name.replace('models/', ''))
           .filter(name => name.includes('gemini') && !name.includes('vision') && !name.includes('embedding') && !name.includes('2.5'));
         
-        // Flash загваруудыг хамгийн эхэнд эрэмбэлэх (хурдтай + өндөр лимиттэй)
         const flashModels = available.filter(n => n.includes('flash'));
         const otherModels = available.filter(n => !n.includes('flash'));
         models = [...new Set([...flashModels, ...models, ...otherModels])];
@@ -85,20 +83,19 @@ module.exports = async (req, res) => {
     return { reply: '', model: null, error: lastError };
   }
 
-  // 1. GET хүсэлт (Test горим ба Facebook Webhook баталгаажуулалт)
   if (req.method === 'GET') {
+    const settingsArr = await sbFetch('bot_settings?id=eq.1');
+    const settings = (settingsArr && settingsArr[0]) || {};
+
+    const geminiKey = (settings.gemini_api_key || process.env.GEMINI_API_KEY || '').trim();
+    const prompt = settings.ai_system_prompt || 'Та бол найрсаг туслах.';
+
+    let aiTest = { reply: '', model: null, error: 'Gemini key олдсонгүй' };
+    if (geminiKey) {
+      aiTest = await askGemini(geminiKey, prompt, 'Сайн байна уу');
+    }
+
     if (req.query.test) {
-      const settingsArr = await sbFetch('bot_settings?id=eq.1');
-      const settings = (settingsArr && settingsArr[0]) || {};
-
-      const geminiKey = (settings.gemini_api_key || process.env.GEMINI_API_KEY || '').trim();
-      const prompt = settings.ai_system_prompt || 'Та бол найрсаг туслах.';
-
-      let aiTest = { reply: '', model: null, error: 'Gemini key олдсонгүй' };
-      if (geminiKey) {
-        aiTest = await askGemini(geminiKey, prompt, 'Сайн байна уу');
-      }
-
       return res.status(200).json({
         status: 'Сервер хэвийн ажиллаж байна',
         supabase_url: SUPABASE_URL,
@@ -122,7 +119,6 @@ module.exports = async (req, res) => {
     return res.status(403).send('Verification failed');
   }
 
-  // 2. POST хүсэлт (Webhook болон Broadcast)
   if (req.method === 'POST') {
     try {
       const settingsArr = await sbFetch('bot_settings?id=eq.1');
