@@ -1,5 +1,5 @@
 module.exports = async (req, res) => {
-  // Таны Supabase URL-ийг шууд анхдагч утгаар хадгаллаа (Дахиж салахгүй)
+  // Таны Supabase URL анхдагч утгаар хадгалагдсан
   let rawUrl = (process.env.SUPABASE_URL || 'https://kwytoixgrvhdxkzbnafv.supabase.co').trim();
   const SUPABASE_URL = rawUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
   const SUPABASE_KEY = (process.env.SUPABASE_KEY || '').trim();
@@ -24,14 +24,33 @@ module.exports = async (req, res) => {
     }
   }
 
+  // Gemini AI дуудах функц (Gemini 3.1 загварууд + Автоматаар боломжит загвар илрүүлэгчтэй)
   async function askGemini(apiKey, systemPrompt, userText) {
-    // Google Gemini API-ийн албан ёсны загварууд
-    const models = [
-      'gemini-2.5-flash',
-      'gemini-2.0-flash',
-      'gemini-1.5-flash',
-      'gemini-2.5-pro'
+    let models = [
+      'gemini-3.1-flash-preview',
+      'gemini-3.1-flash-lite-preview',
+      'gemini-3.1-pro-preview',
+      'gemini-3.0-flash',
+      'gemini-flash-latest'
     ];
+
+    // Түлхүүрт зөвшөөрөгдсөн загваруудыг Google-ээс шууд асууж жагсаалтыг баяжуулах
+    try {
+      const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+      const listData = await listRes.json();
+      if (listData?.models) {
+        const available = listData.models
+          .filter(m => m.supportedGenerationMethods?.includes('generateContent'))
+          .map(m => m.name.replace('models/', ''))
+          .filter(name => name.includes('gemini') && !name.includes('vision') && !name.includes('embedding') && !name.includes('2.5'));
+        
+        // Flash загваруудыг хамгийн эхэнд эрэмбэлэх (хурдтай + өндөр лимиттэй)
+        const flashModels = available.filter(n => n.includes('flash'));
+        const otherModels = available.filter(n => !n.includes('flash'));
+        models = [...new Set([...flashModels, ...models, ...otherModels])];
+      }
+    } catch (e) {}
+
     let lastError = null;
 
     for (const model of models) {
@@ -135,7 +154,6 @@ module.exports = async (req, res) => {
             const senderPsid = event.sender?.id;
             if (!senderPsid || event.message?.is_echo) continue;
 
-            // Хэрэглэгч Get Started дарсан эсвэл текст бичсэнийг ялгах
             let userText = event.message?.text || '';
             if (event.postback) {
               const payload = event.postback.payload || '';
