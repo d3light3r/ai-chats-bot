@@ -1,5 +1,4 @@
 module.exports = async (req, res) => {
-  // Vercel Environment Variables эсвэл Supabase тохиргооноос авах
   let rawUrl = (process.env.SUPABASE_URL || '').trim();
   const SUPABASE_URL = rawUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
   const SUPABASE_KEY = (process.env.SUPABASE_KEY || '').trim();
@@ -71,7 +70,6 @@ module.exports = async (req, res) => {
     const settingsArr = await sbFetch('bot_settings?id=eq.1');
     const settings = (settingsArr && settingsArr[0]) || {};
     
-    // Хэрэв Supabase дээр байхгүй бол Environment variable эсвэл fallback ашиглана
     const geminiKey = (settings.gemini_api_key || process.env.GEMINI_API_KEY || '').trim();
     const prompt = settings.ai_system_prompt || 'Та бол найрсаг туслах.';
 
@@ -136,7 +134,17 @@ module.exports = async (req, res) => {
             const senderPsid = event.sender?.id;
             if (!senderPsid || event.message?.is_echo) continue;
 
-            const userText = event.message?.text || event.postback?.payload || '';
+            // Хэрэглэгч Get Started дарс эсвэл текст/postback явуулсныг ялгах
+            let userText = event.message?.text || '';
+            if (event.postback) {
+              const payload = event.postback.payload || '';
+              if (payload === 'GET_STARTED' || !payload) {
+                userText = 'Сайн байна уу? Танд ямар мэдээлэл хэрэгтэй вэ?';
+              } else {
+                userText = payload;
+              }
+            }
+
             if (!userText) continue;
 
             const phoneMatch = userText.match(/\b[6-9]\d{7}\b/);
@@ -161,7 +169,6 @@ module.exports = async (req, res) => {
               })
             });
 
-            // Түлхүүр үгийн автоматжуулалт шалгах
             const automations = await sbFetch('automations?is_active=eq.true&trigger_type=eq.message_keyword');
             let replyText = '';
             for (const auto of (automations || [])) {
@@ -172,7 +179,6 @@ module.exports = async (req, res) => {
               }
             }
 
-            // AI хариулт авах
             if (!replyText && GEMINI_KEY) {
               const aiResult = await askGemini(GEMINI_KEY, SYSTEM_PROMPT, userText);
               replyText = aiResult.reply;
