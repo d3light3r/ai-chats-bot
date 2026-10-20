@@ -127,7 +127,7 @@ module.exports = async (req, res) => {
             // Хэрэв дүрэм таараагүй бол 24/7 Gemini AI хариулна
             if (!replyText && GEMINI_KEY) {
               try {
-                const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`, {
+                const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_KEY}`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
