@@ -1,10 +1,9 @@
 module.exports = async (req, res) => {
-  // Supabase URL-ийн ард /rest/v1/ байвал автоматаар цэвэрлэнэ
+  // Vercel Environment Variables эсвэл Supabase тохиргооноос авах
   let rawUrl = (process.env.SUPABASE_URL || '').trim();
   const SUPABASE_URL = rawUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
   const SUPABASE_KEY = (process.env.SUPABASE_KEY || '').trim();
 
-  // Туслах функц: Supabase REST API дуудах
   async function sbFetch(path, options = {}) {
     if (!SUPABASE_URL || !SUPABASE_KEY) return null;
     try {
@@ -25,7 +24,6 @@ module.exports = async (req, res) => {
     }
   }
 
-  // Туслах функц: Gemini AI-г хамгийн сүүлийн үеийн загваруудаар дараалж дуудах
   async function askGemini(apiKey, systemPrompt, userText) {
     const models = [
       'gemini-3.8-flash',
@@ -44,13 +42,7 @@ module.exports = async (req, res) => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    { text: `${systemPrompt}\n\nХэрэглэгчийн мессеж: ${userText}` }
-                  ]
-                }
-              ]
+              contents: [{ parts: [{ text: `${systemPrompt}\n\nХэрэглэгчийн мессеж: ${userText}` }] }]
             })
           }
         );
@@ -74,27 +66,29 @@ module.exports = async (req, res) => {
     return { reply: '', model: null, error: lastError };
   }
 
-  // 1. Шалгах горим болон Facebook Webhook баталгаажуулалт (GET)
+  // 1. GET хүсэлт (Test горим)
   if (req.method === 'GET') {
+    const settingsArr = await sbFetch('bot_settings?id=eq.1');
+    const settings = (settingsArr && settingsArr[0]) || {};
+    
+    // Хэрэв Supabase дээр байхгүй бол Environment variable эсвэл fallback ашиглана
+    const geminiKey = (settings.gemini_api_key || process.env.GEMINI_API_KEY || '').trim();
+    const prompt = settings.ai_system_prompt || 'Та бол найрсаг туслах.';
+
+    let aiTest = { reply: '', model: null, error: 'Gemini key олдсонгүй' };
+    if (geminiKey) {
+      aiTest = await askGemini(geminiKey, prompt, 'Сайн байна уу');
+    }
+
     if (req.query.test) {
-      const settingsArr = await sbFetch('bot_settings?id=eq.1');
-      const settings = (settingsArr && settingsArr[0]) || {};
-      const geminiKey = (settings.gemini_api_key || '').trim();
-      const prompt = settings.ai_system_prompt || 'Та бол найрсаг туслах.';
-
-      let aiTest = { reply: '', model: null, error: 'Gemini key хадгалагдаагүй' };
-      if (geminiKey) {
-        aiTest = await askGemini(geminiKey, prompt, 'Сайн байна уу');
-      }
-
       return res.status(200).json({
         status: 'Сервер хэвийн ажиллаж байна',
-        supabase_url: SUPABASE_URL,
+        supabase_url: SUPABASE_URL || 'Тохируулаагүй',
         supabase_key_configured: Boolean(SUPABASE_KEY),
         database_connected: Boolean(settingsArr && settingsArr.length > 0),
-        facebook_token_saved: Boolean(settings.page_access_token),
+        facebook_token_saved: Boolean(settings.page_access_token || process.env.PAGE_ACCESS_TOKEN),
         gemini_key_saved: Boolean(geminiKey),
-        page_id_saved: settings.page_id || 'Хадгалагдаагүй',
+        page_id_saved: settings.page_id || process.env.PAGE_ID || 'Хадгалагдаагүй',
         ai_working_model: aiTest.model || 'Ажилласангүй',
         ai_sample_reply: aiTest.reply || null,
         ai_error: aiTest.error || null
@@ -110,18 +104,18 @@ module.exports = async (req, res) => {
     return res.status(403).send('Verification failed');
   }
 
-  // 2. Мессеж, Коммент болон Масс илгээлт хүлээн авах (POST)
+  // 2. POST хүсэлт (Webhook болон Broadcast)
   if (req.method === 'POST') {
     try {
       const settingsArr = await sbFetch('bot_settings?id=eq.1');
       const settings = (settingsArr && settingsArr[0]) || {};
-      const PAGE_TOKEN = (settings.page_access_token || '').trim();
-      const GEMINI_KEY = (settings.gemini_api_key || '').trim();
+      
+      const PAGE_TOKEN = (settings.page_access_token || process.env.PAGE_ACCESS_TOKEN || '').trim();
+      const GEMINI_KEY = (settings.gemini_api_key || process.env.GEMINI_API_KEY || '').trim();
       const SYSTEM_PROMPT = settings.ai_system_prompt || 'Та бол найрсаг туслах.';
 
       const body = req.body || {};
 
-      // A. Масс мессеж илгээх команд
       if (body.action === 'broadcast' && PAGE_TOKEN) {
         const contacts = await sbFetch('contacts?select=psid');
         let sent = 0;
@@ -136,10 +130,8 @@ module.exports = async (req, res) => {
         return res.status(200).json({ sent });
       }
 
-      // B. Facebook-ээс ирсэн дохио
       if (body.object === 'page') {
         for (const entry of (body.entry || [])) {
-          // 1) Messenger-ээр ирсэн чат
           for (const event of (entry.messaging || [])) {
             const senderPsid = event.sender?.id;
             if (!senderPsid || event.message?.is_echo) continue;
@@ -147,7 +139,6 @@ module.exports = async (req, res) => {
             const userText = event.message?.text || event.postback?.payload || '';
             if (!userText) continue;
 
-            // Хэрэглэгчийг бүртгэх + Утасны дугаар таних
             const phoneMatch = userText.match(/\b[6-9]\d{7}\b/);
             const contactData = { psid: senderPsid, last_active_at: new Date().toISOString() };
             if (phoneMatch) {
@@ -160,7 +151,6 @@ module.exports = async (req, res) => {
               body: JSON.stringify(contactData)
             });
 
-            // Хэрэглэгчийн мессежийг хадгалах
             await sbFetch('messages', {
               method: 'POST',
               body: JSON.stringify({
@@ -171,7 +161,7 @@ module.exports = async (req, res) => {
               })
             });
 
-            // Түлхүүр үгийн автоматжуулалт шалгах (Зөвхөн түлхүүр үг бичигдсэн дүрмийг шалгана)
+            // Түлхүүр үгийн автоматжуулалт шалгах
             const automations = await sbFetch('automations?is_active=eq.true&trigger_type=eq.message_keyword');
             let replyText = '';
             for (const auto of (automations || [])) {
@@ -182,7 +172,7 @@ module.exports = async (req, res) => {
               }
             }
 
-            // Хэрэв дүрэм таараагүй бол 24/7 Gemini AI хариулна
+            // AI хариулт авах
             if (!replyText && GEMINI_KEY) {
               const aiResult = await askGemini(GEMINI_KEY, SYSTEM_PROMPT, userText);
               replyText = aiResult.reply;
@@ -206,7 +196,6 @@ module.exports = async (req, res) => {
             }
           }
 
-          // 2) Постын доорх Коммент уншиж чат бичих
           for (const change of (entry.changes || [])) {
             if (change.field === 'feed' && change.value?.item === 'comment' && change.value?.verb === 'add') {
               const commentId = change.value.comment_id;
